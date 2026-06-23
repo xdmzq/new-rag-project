@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行业知识库 RAG 系统 - 多行业智能检索问答</title>
+    <title>专业知识库 RAG 系统</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <style>
         :root {
@@ -496,7 +496,7 @@
             </div>
 
             <div class="ranking-badge">
-                🏆 支持 12+ 行业知识库
+                🏆 支持多个行业知识库
             </div>
 
             <div class="badges">
@@ -536,11 +536,7 @@
                     系统采用先进的向量检索技术，结合语义理解能力，为用户提供准确、可靠的专业领域问答服务。
                 </p>
                 <p>
-                    系统支持<strong>半导体、IT软件、互联网、通信电子、智能制造、生物健康、新材料、能源环保、消费品服务、军工、商业航天、量子计算、核聚变、人工智能</strong>等 12+ 个行业领域。
-                    通过构建行业专属知识库，结合 FAISS 向量数据库和 Embedding 模型，实现了高效的文档检索和内容生成。
-                </p>
-                <p>
-                    实验表明，该系统在多个行业基准测试中表现优异，检索准确率达到 <strong>90%+</strong>，
+                    实测表明，该系统在多个行业基准测试中表现优异，检索准确率达到 <strong>90%+</strong>，
                     回答质量显著优于传统检索方法，为专业领域的知识获取提供了可靠的技术解决方案。
                 </p>
             </div>
@@ -561,7 +557,7 @@
                     <div class="feature-icon">⚡</div>
                     <div class="feature-title">高效向量检索</div>
                     <div class="feature-desc">
-                        基于 FAISS 的向量相似度搜索，支持百万级文档的毫秒级检索，结合重排序提升结果相关性。
+                        基于向量相似度和关键词混合加权搜索，支持百万级文档的秒级检索，结合重排序提升结果相关性。
                     </div>
                 </div>
                 <div class="feature-card">
@@ -659,7 +655,7 @@
                 <h3 style="margin: 20px 0 10px; font-size: 1.1rem;">文档处理流程</h3>
                 <p>
                     系统采用自动化的文档处理流水线，支持 Excel、PDF、Word 等多种格式的文档导入。
-                    文档经过文本提取、分块（Chunking）、向量化（Embedding）后存储到 FAISS 向量数据库中。
+                    文档经过文本提取、分块（Chunking）、向量化（Embedding）后存储成多层关联向量数据库。
                 </p>
                 
                 <div class="code-block">
