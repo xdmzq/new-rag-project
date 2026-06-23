@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOAR Intelligence Workspace</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo/笼屉.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='remixicon.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='workspace.css') }}">
+</head>
+<body>
+    <div class="backdrop" id="backdrop"></div>
+    <button class="rail-toggle" id="railToggle" aria-label="切换侧边栏">
+        <i class="ri-menu-4-line"></i>
+    </button>
+
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <div class="app-shell">
+        <aside class="control-rail" id="controlRail">
+            <div class="brand-block">
+                <div class="brand-mark">
+                    <img src="{{ url_for('static', filename='logo/rag_system_logo.png') }}" alt="行业知识库 RAG 系统 logo">
+                </div>
+                <div class="brand-copy">
+                    <h1>行业知识库 RAG 系统</h1>
+                    <p class="brand-kicker">多行业智能检索与问答</p>
+                </div>
+            </div>
+
+            <section class="rail-section">
+                <div class="section-head">
+                    <span>知识库矩阵</span>
+                </div>
+                <div class="kb-grid">
+                    {% for item in categories %}
+                    <button
+                        class="kb-card{% if item.active %} is-active{% else %} is-disabled{% endif %}{% if item.id == category %} is-selected{% endif %}"
+                        data-category="{{ item.id }}"
+                        {% if not item.active %}disabled{% endif %}
+                    >
+                        <span class="kb-card-label">{{ item.label }}</span>
+                        <span class="kb-card-meta">{{ item.id }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="rail-section">
+                <div class="section-head">
+                    <span>最近任务</span>
+                    <span class="section-note">{{ history | length }}</span>
+                </div>
+                <div class="history-stack">
+                    {% if history %}
+                        {% for item in history %}
+                        <a class="history-card{% if item.run_id == run_id %} current{% endif %}" href="/session/{{ item.run_id }}">
+                            <div class="history-title">{{ item.prompt or '未命名问题' }}</div>
+                            <div class="history-meta">
+                                <span>{{ item.category_label or item.category }}</span>
+                                <span>{{ item.started_at or '' }}</span>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <div class="history-empty">
+                            新任务开始后，这里会显示最近的检索会话。
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+        </aside>
+
+        <main class="mission-stage">
+            <section class="command-panel">
+                <div class="panel-topline">
+                    <div class="status-group">
+                        <span class="status-pill" id="statusPill">待命</span>
+                        <span class="run-chip" id="runChip">{{ run_id or '尚未生成 run_id' }}</span>
+                    </div>
+                    <div class="mode-note">检索模式：{{ retrieval_mode }}</div>
+                </div>
+
+                {% if invalid %}
+                <div class="notice-banner is-error">
+                    这个会话 ID 没有对应的运行记录。你可以直接发起一个新问题。
+                </div>
+                {% endif %}
+
+                <form id="queryForm" class="query-form">
+                    <label class="query-label" for="queryInput">输入一个需要从知识库中验证的问题</label>
+                    <textarea
+                        id="queryInput"
+                        name="query"
+                        class="query-input"
+                        placeholder="例如：国内商业航天企业的核心竞争力通常体现在哪些方面？"
+                    >{{ prompt }}</textarea>
+                    <div class="form-row">
+                        <div class="signal-strip">
+                            <button type="button" class="signal-chip" data-fill="国内商业航天企业的核心竞争力通常体现在哪些方面？">商业航天竞争力</button>
+                            <button type="button" class="signal-chip" data-fill="低轨卫星互联网的发展驱动因素和政策支持有哪些？">低轨卫星政策</button>
+                            <button type="button" class="signal-chip" data-fill="请结合表格信息比较不同火箭类型在价格和频次上的差异。">表格型对比问题</button>
+                        </div>
+                        <button type="submit" class="launch-button" id="launchButton">
+                            <i class="ri-rocket-2-line"></i>
+                            <span>启动检索</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="workspace-grid">
+                <article class="panel answer-panel">
+                    <div class="panel-header">
+                        <div>
+                            <p class="panel-kicker">Answer</p>
+                            <h3>结论区</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body answer-body" id="answerBody">
+                        <div class="empty-state">
+                            <strong>等待任务开始</strong>
+                            <span>发起问题后，这里会实时流式展示答案。</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel evidence-panel">
+                    <div class="panel-header">
+                        <div>
+                            <p class="panel-kicker">Evidence</p>
+                            <h3>证据与引用</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body references-list" id="referencesList">
+                        <div class="empty-state compact">
+                            <span>结果返回后，这里会显示页面、表格和图片引用。</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel activity-panel">
+                    <div class="panel-header">
+                        <div>
+                            <p class="panel-kicker">Activity</p>
+                            <h3>运行轨迹</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body activity-feed" id="activityFeed">
+                        <div class="empty-state compact">
+                            <span>检索启动后，这里会显示阶段性进度。</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel followup-panel">
+                    <div class="panel-header">
+                        <div>
+                            <p class="panel-kicker">Next</p>
+                            <h3>继续追问</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body followup-list" id="followupList">
+                        <div class="empty-state compact">
+                            <span>如果后端返回相关问题，会在这里给出下一步建议。</span>
+                        </div>
+                    </div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <script id="workspace-bootstrap" type="application/json">{{ {
+        "runId": run_id,
+        "prompt": prompt,
+        "category": category,
+        "retrievalMode": retrieval_mode,
+        "invalid": invalid,
+        "categories": categories
+    } | tojson }}</script>
+    <script>
+        const bootstrap = JSON.parse(document.getElementById("workspace-bootstrap").textContent);
+
+        const state = {
+            runId: bootstrap.runId || "",
+            category: bootstrap.category || "space",
+            polling: false,
+            done: false,
+            cursor: 0,
+            answer: "",
+            references: [],
+            relatedQuestions: [],
+            activityKeys: new Set(),
+        };
+
+        const controlRail = document.getElementById("controlRail");
+        const backdrop = document.getElementById("backdrop");
+        const railToggle = document.getElementById("railToggle");
+        const queryForm = document.getElementById("queryForm");
+        const queryInput = document.getElementById("queryInput");
+        const launchButton = document.getElementById("launchButton");
+        const answerBody = document.getElementById("answerBody");
+        const referencesList = document.getElementById("referencesList");
+        const activityFeed = document.getElementById("activityFeed");
+        const followupList = document.getElementById("followupList");
+        const statusPill = document.getElementById("statusPill");
+        const runChip = document.getElementById("runChip");
+
+        function toggleRail(forceOpen) {
+            const open = typeof forceOpen === "boolean" ? forceOpen : !controlRail.classList.contains("is-open");
+            controlRail.classList.toggle("is-open", open);
+            backdrop.classList.toggle("is-visible", open);
+        }
+
+        railToggle.addEventListener("click", () => toggleRail());
+        backdrop.addEventListener("click", () => toggleRail(false));
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function formatRichText(value) {
+            return escapeHtml(value).replace(/\n/g, "<br>");
+        }
+
+        function encodeMediaPath(path) {
+            return String(path || "")
+                .split("/")
+                .map(segment => encodeURIComponent(segment))
+                .join("/");
+        }
+
+        function setStatus(label, tone) {
+            statusPill.textContent = label;
+            statusPill.dataset.tone = tone || "idle";
+        }
+
+        function resetWorkspaceVisuals() {
+            answerBody.innerHTML = `
+                <div class="stream-shell">
+                    <div class="stream-title">实时回答</div>
+                    <div class="stream-content" id="streamContent"></div>
+                </div>
+            `;
+            referencesList.innerHTML = '<div class="empty-state compact"><span>等待后端返回引用结果。</span></div>';
+            followupList.innerHTML = '<div class="empty-state compact"><span>等待后端给出下一步建议。</span></div>';
+            activityFeed.innerHTML = "";
+            state.answer = "";
+            state.references = [];
+            state.relatedQuestions = [];
+            state.activityKeys = new Set();
+        }
+
+        function appendActivity(entry) {
+            const phase = entry.phase || "raw";
+            const msg = entry.message || entry.pretty || "";
+            if (!msg || phase === "answer_chunk") {
+                return;
+            }
+            const key = `${phase}:${msg}`;
+            if (state.activityKeys.has(key)) {
+                return;
+            }
+            state.activityKeys.add(key);
+            if (!activityFeed.children.length) {
+                activityFeed.innerHTML = "";
+            }
+            const item = document.createElement("div");
+            item.className = "activity-item";
+            item.innerHTML = `
+                <span class="activity-phase">${escapeHtml(phase)}</span>
+                <div class="activity-message">${formatRichText(msg)}</div>
+            `;
+            activityFeed.prepend(item);
+        }
+
+        function renderAnswer() {
+            const streamContent = document.getElementById("streamContent");
+            if (!streamContent) return;
+            if (!state.answer) {
+                streamContent.innerHTML = '<div class="empty-inline">答案生成中...</div>';
+                return;
+            }
+            streamContent.innerHTML = `<div class="answer-copy">${formatRichText(state.answer)}</div>`;
+        }
+
+        function renderReferences() {
+            if (!state.references.length) {
+                referencesList.innerHTML = '<div class="empty-state compact"><span>这次回答没有返回引用。</span></div>';
+                return;
+            }
+            referencesList.innerHTML = state.references.map((ref, index) => {
+                const mediaPreview = (ref.image_paths || []).slice(0, 1).map((imgPath) => `
+                    <a class="thumb-link" href="/media/${encodeMediaPath(imgPath)}" target="_blank" rel="noreferrer">
+                        <img src="/media/${encodeMediaPath(imgPath)}" alt="preview">
+                    </a>
+                `).join("");
+                const sourceLink = ref.source_rel_path
+                    ? `<a class="inline-link" href="/media/${encodeMediaPath(ref.source_rel_path)}" target="_blank" rel="noreferrer">打开原文</a>`
+                    : "";
+                const tableLinks = (ref.table_paths || []).slice(0, 3).map((tablePath) => `
+                    <a class="micro-tag" href="/media/${encodeMediaPath(tablePath)}" target="_blank" rel="noreferrer">表格</a>
+                `).join("");
+                const imageLinks = (ref.image_paths || []).slice(0, 3).map((imgPath) => `
+                    <a class="micro-tag" href="/media/${encodeMediaPath(imgPath)}" target="_blank" rel="noreferrer">图片</a>
+                `).join("");
+                return `
+                    <div class="reference-card">
+                        <div class="reference-order">#${index + 1}</div>
+                        <div class="reference-main">
+                            <div class="reference-title">${escapeHtml(ref.doc_name || ref.source_name || "未命名文档")}</div>
+                            <div class="reference-preview">${escapeHtml(ref.preview_text || "")}</div>
+                            <div class="reference-meta">
+                                <span>Score ${Number(ref.score || 0).toFixed(3)}</span>
+                                <span>Page ${escapeHtml(ref.page_no || "-")}</span>
+                                <span>${escapeHtml(ref.type || "page_bundle")}</span>
+                            </div>
+                            <div class="reference-links">${sourceLink}${tableLinks}${imageLinks}</div>
+                        </div>
+                        ${mediaPreview ? `<div class="reference-thumb">${mediaPreview}</div>` : ""}
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function renderFollowups() {
+            if (!state.relatedQuestions.length) {
+                followupList.innerHTML = '<div class="empty-state compact"><span>这次回答没有返回后续问题。</span></div>';
+                return;
+            }
+            followupList.innerHTML = state.relatedQuestions.map((question, index) => `
+                <button class="followup-item" type="button" data-followup-index="${index}">
+                    ${escapeHtml(question)}
+                </button>
+            `).join("");
+            document.querySelectorAll(".followup-item").forEach((button) => {
+                button.addEventListener("click", () => {
+                    const idx = Number(button.dataset.followupIndex || -1);
+                    queryInput.value = state.relatedQuestions[idx] || "";
+                    queryInput.focus();
+                });
+            });
+        }
+
+        function consumeLog(entry) {
+            appendActivity(entry);
+            if (entry.phase === "answer_chunk" && entry.data && entry.data.text) {
+                state.answer = entry.data.text;
+                renderAnswer();
+            }
+            if (entry.phase === "answer" && entry.message && !state.answer) {
+                state.answer = entry.message;
+                renderAnswer();
+            }
+            if (entry.phase === "result" && entry.data) {
+                state.answer = entry.data.answer || state.answer;
+                state.references = Array.isArray(entry.data.references) ? entry.data.references : [];
+                state.relatedQuestions = Array.isArray(entry.data.related_questions) ? entry.data.related_questions : [];
+                renderAnswer();
+                renderReferences();
+                renderFollowups();
+            }
+            if (entry.phase === "final") {
+                state.done = true;
+                setStatus("完成", "success");
+            }
+            if (entry.phase === "error") {
+                state.done = true;
+                setStatus("异常", "danger");
+            }
+        }
+
+        async function pollLogs() {
+            if (!state.runId || state.polling) return;
+            state.polling = true;
+            setStatus("运行中", "running");
+            try {
+                while (!state.done) {
+                    const response = await fetch(`/logs/${state.runId}?cursor=${state.cursor}`);
+                    const payload = await response.json();
+                    if (payload.status !== "ok") {
+                        throw new Error(payload.message || "日志拉取失败");
+                    }
+                    (payload.logs || []).forEach((entry) => consumeLog(entry));
+                    state.cursor = payload.next_cursor || state.cursor;
+                    if (payload.done) {
+                        state.done = true;
+                        if (statusPill.dataset.tone !== "danger") {
+                            setStatus("完成", "success");
+                        }
+                        break;
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 1200));
+                }
+            } catch (error) {
+                appendActivity({ phase: "error", message: error.message || "日志拉取失败" });
+                setStatus("异常", "danger");
+            } finally {
+                state.polling = false;
+            }
+        }
+
+        function highlightSelectedCategory() {
+            document.querySelectorAll(".kb-card").forEach((button) => {
+                button.classList.toggle("is-selected", button.dataset.category === state.category);
+            });
+        }
+
+        document.querySelectorAll(".kb-card.is-active").forEach((button) => {
+            button.addEventListener("click", () => {
+                state.category = button.dataset.category;
+                highlightSelectedCategory();
+            });
+        });
+
+        document.querySelectorAll(".signal-chip").forEach((button) => {
+            button.addEventListener("click", () => {
+                queryInput.value = button.dataset.fill || "";
+                queryInput.focus();
+            });
+        });
+
+        queryForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) {
+                queryInput.focus();
+                return;
+            }
+
+            launchButton.disabled = true;
+            launchButton.classList.add("is-busy");
+            setStatus("排队中", "running");
+            resetWorkspaceVisuals();
+            state.done = false;
+            state.cursor = 0;
+
+            try {
+                const body = new URLSearchParams();
+                body.set("query", query);
+                body.set("category", state.category);
+                body.set("started_at", new Date().toISOString());
+
+                const response = await fetch("/solve", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                    },
+                    body: body.toString(),
+                });
+                const payload = await response.json();
+                if (payload.status !== "accepted") {
+                    throw new Error(payload.message || "任务启动失败");
+                }
+
+                state.runId = payload.run_id;
+                runChip.textContent = state.runId;
+                const newUrl = `/session/${state.runId}?prompt=${encodeURIComponent(query)}&category=${encodeURIComponent(state.category)}&retrieval_mode=v2`;
+                window.history.pushState({}, "", newUrl);
+                appendActivity({ phase: "meta", message: `收到问题：${query}` });
+                await pollLogs();
+            } catch (error) {
+                appendActivity({ phase: "error", message: error.message || "任务启动失败" });
+                setStatus("异常", "danger");
+            } finally {
+                launchButton.disabled = false;
+                launchButton.classList.remove("is-busy");
+            }
+        });
+
+        highlightSelectedCategory();
+        if (bootstrap.invalid) {
+            setStatus("无效会话", "danger");
+        } else if (state.runId) {
+            resetWorkspaceVisuals();
+            runChip.textContent = state.runId;
+            pollLogs();
+        }
+    </script>
+</body>
+</html>
